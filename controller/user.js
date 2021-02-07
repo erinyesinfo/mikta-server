@@ -2,12 +2,12 @@ const User = require("../models/User");
 
 exports.login = function(req, res) {
     const user = new User(req.body);
-    user.login().then(function(id) {
+    user.login().then(function(filterData) {
         let day = 1000 * 3600 * 24;
         req.session.cookie.expires = new Date(Date.now() + day);
         req.session.cookie.maxAge = day;
         req.session.cookie.httpOnly = true;
-        req.session.user = { _id: id, username: user.data.username };
+        req.session.user = JSON.parse(filterData);
         req.session.save(() => res.send("success"));
     }).catch(function(e) {
         res.send(e);
@@ -20,12 +20,12 @@ exports.logout = function(req, res) {
 
 exports.register = function(req, res) {
     const user = new User(req.body);
-    user.register().then((id) => {
+    user.register().then(filterData => {
         let day = 1000 * 3600 * 24;
         req.session.cookie.expires = new Date(Date.now() + day);
         req.session.cookie.maxAge = day;
         req.session.cookie.httpOnly = true;
-        req.session.user = { _id: id, username: user.data.username };
+        req.session.user = JSON.parse(filterData);
         req.session.save(() => res.send("success"));
     }).catch(regErrors => {
         res.send(JSON.stringify(regErrors));
@@ -42,21 +42,7 @@ exports.home = function(req, res) {
 
 exports.userLogedIn = function(req, res) {
     if (req.session.user) {
-        return res.send("success");
-    } else {
-        return res.send("failure");
-    }
-};
-
-exports.readUserData = function(req, res) {
-    const user = new User(req.body);
-    if (req.session.user) {
-        const { _id } = req.session.user;
-        return user.getData(_id).then(function(data) {
-            res.send(JSON.stringify(data));
-        }).catch(function(e) {
-            res.send("failure");
-        });
+        return res.send(JSON.stringify(req.session.user));
     } else {
         return res.send("failure");
     }

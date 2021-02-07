@@ -1,53 +1,38 @@
-const dataCollection = require("../db").db().collection("data");
+const SharedMONGOCOLLECTION = require("../db").db().collection("shared");
+const LikesMONGOCOLLECTION = require("../db").db().collection("likes");
+const CollectionsMONGOCOLLECTION = require("../db").db().collection("collections");
 const ObjectID = require("mongodb").ObjectID;
 
 const Data = function(data) {
-    this.data = data;
-    this.errors = [];
+  this.data = data;
+  this.errors = [];
 };
 
-// upadate shared data
-Data.prototype.sharedData = function(id) {
-    return new Promise(async (resolve, reject) => {
-        await dataCollection.findOneAndUpdate(
-            { authorID: ObjectID(id) },
-            { $set: { shared: this.data } }
-        );
-        resolve("successfully")
-    });
-};
-
-// upadate likes data
-Data.prototype.likesData = function(id) {
-    return new Promise(async (resolve, reject) => {
-        await dataCollection.findOneAndUpdate(
-            { authorID: ObjectID(id) },
-            { $set: { likes: this.data } }
-        );
-        resolve("successfully")
-    });
-};
-
-// upadate collection data
-Data.prototype.collectionData = function(id) {
-    return new Promise(async (resolve, reject) => {
-        await dataCollection.findOneAndUpdate(
-            { authorID: ObjectID(id) },
-            { $set: { collection: this.data } }
-        );
-        resolve("successfully")
-    });
-};
-
-// upadate following data
-Data.prototype.followingData = function(id) {
-    return new Promise(async (resolve, reject) => {
-        await dataCollection.findOneAndUpdate(
-            { authorID: ObjectID(id) },
-            { $set: { following: this.data } }
-        );
-        resolve("successfully")
-    });
+Data.prototype.ReadHomeDataLength = function(id) {
+  return new Promise(async (resolve, reject) => {
+    if (typeof(id) !== 'string') {
+      reject();
+      return;
+    }
+    let sharedData = await SharedMONGOCOLLECTION.aggregate([
+        { $match: { authorID: ObjectID(id) } },
+        { $project: { totalshared: { $size: "$shared" } } }
+    ]).toArray();
+    let likesData = await LikesMONGOCOLLECTION.aggregate([
+        { $match: { authorID: ObjectID(id) } },
+        { $project: { totallikes: { $size: "$likes" } } }
+    ]).toArray();
+    let collectionsData = await CollectionsMONGOCOLLECTION.aggregate([
+        { $match: { authorID: ObjectID(id) } },
+        { $project: { totalcollections: { $size: "$collections" } } }
+    ]).toArray();
+    let data = {
+        shared: sharedData[0].totalshared,
+        likes: likesData[0].totallikes,
+        collections: collectionsData[0].totalcollections,
+    };
+    resolve(JSON.stringify(data));
+  });
 };
 
 module.exports = Data;

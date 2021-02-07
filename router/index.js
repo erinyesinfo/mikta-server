@@ -2,28 +2,42 @@ const express = require("express");
 const router = express.Router();
 
 const user = require("../controller/user");
+const profile = require("../controller/profile");
+const followings = require("../controller/followings");
+const likes = require("../controller/likes");
+const shared = require("../controller/shared");
+const collections = require("../controller/collections");
 const data = require("../controller/data");
-const account = require("../controller/account");
 
 router.get("/", user.home);
-router.get("/user-login", user.userLogedIn);// check if user is login
-router.post("/user-data", user.readUserData);// send user data
+router.get("/auth", user.userLogedIn);// check if user is login
 
-// auth
+/* Authentication */
 router.post("/register", user.register);
 router.post("/login", user.login);
 router.post("/logout", user.logout);
 
-// update account data
-router.post("/data-account", account.updateAccount);
-router.post("/data-account-photo", account.updateAccountPhoto);
-router.post("/data-account-password", account.updateAccountPassword);
-router.post("/data-account-close", account.closeAccount);
+/* Read user profile data */
+router.get("/profile", profile.ReadUserProfileController);
 
-// add more data
-router.post("/data-shared", data.postSharedData);
-router.post("/data-likes", data.postLikesData);
-router.post("/data-collection", data.postCollectionData);
-router.post("/data-following", data.postFollowingData);
+/* Update user profile data */
+router.post("/profile", profile.UpdateUserProfileController);
+router.post("/profile/photo", profile.UpdateUserProfilePhotoController);
+router.post("/profile/password", profile.UpdateUserProfilePasswordController);
+router.post("/close-account", profile.CloseAccountController);
+
+/* Update followings, likes, shared, collections data */
+router.post("/followings", followings.UpdateFollowingsDataController);
+router.post("/shared", shared.UpdateSharedDataController);
+router.post("/likes", likes.UpdateLikesDataController);
+router.post("/collections", collections.UpdateCollectionsDataController);
+
+/* Read followings, likes, shared, collections data */
+router.get("/followings", followings.ReadUserFollowingsDataController);
+router.get("/shared", shared.ReadUserSharedDataController);
+router.get("/likes", likes.ReadUserLikesDataController);
+router.get("/collections", collections.ReadUserCollectionsDataController);
+/* Read length of(followings, likes, shared, collections) data */
+router.get("/length", data.ReadHomeDataLengthController);
 
 module.exports = router;

@@ -1,10 +1,12 @@
-const usersCollection = require("../db").db().collection("users");
-const dataCollection = require("../db").db().collection("data");
-const ObjectID = require("mongodb").ObjectID;
+const UsersMONGOCOLLECTION = require("../db").db().collection("users");
+const ProfileMONGOCOLLECTION = require("../db").db().collection("profile");
+const SharedMONGOCOLLECTION = require("../db").db().collection("shared");
+const LikesMONGOCOLLECTION = require("../db").db().collection("likes");
+const FollowingsMONGOCOLLECTION = require("../db").db().collection("followings");
+const CollectionsMONGOCOLLECTION = require("../db").db().collection("collections");
 const sanitizeHTML = require("sanitize-html");
 const validator = require("validator");
 const bcryptjs = require("bcryptjs");
-
 const User = function(data) {
   this.data = data;
   this.errors = [];
@@ -27,11 +29,25 @@ User.prototype.cleanUp = function() {
 };
 
 User.prototype.login = function() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     this.cleanUp();
-    usersCollection.findOne({ username: this.data.username }).then(attemptedUser => {
-      if (attemptedUser && bcryptjs.compareSync(this.data.password, attemptedUser.password)) {
-        resolve(attemptedUser._id);
+    UsersMONGOCOLLECTION.aggregate([
+      { $match: {username: this.data.username} },
+      { $lookup: {from: "profile", localField: "_id", foreignField: "authorID", as: "authorDocument"} },
+      { $project: {password: 1, author: {
+        $arrayElemAt: ["$authorDocument", 0]
+      }} }
+    ]).toArray().then(attemptedUser => {
+      if (attemptedUser && bcryptjs.compareSync(this.data.password, attemptedUser[0].password)) {
+        let { firstname, lastname, username, profileImage } = attemptedUser[0].author;
+        let filterData = {
+          _id: attemptedUser[0]._id,
+          firstname,
+          lastname,
+          username,
+          profileImage
+        };
+        resolve(JSON.stringify(filterData));
       } else {
         if (!attemptedUser) {
           return reject("Invalid username!");
@@ -39,7 +55,7 @@ User.prototype.login = function() {
           return reject("Invalid passsword!");
         } reject("Invalid username / passsword!");
       }
-    }).catch(() => reject("Please try again later!"));
+    }).catch(() => reject("Invalid username / passsword!"));
   });
 };
 
@@ -73,13 +89,13 @@ User.prototype.validate = function() {
     
     // Only if username is valid then check to see if it's already taken
     if (this.data.username.length > 2 && this.data.username.length < 31 && validator.isAlphanumeric(this.data.username)) {
-      let usernameExists = await usersCollection.findOne({username: this.data.username})
+      let usernameExists = await UsersMONGOCOLLECTION.findOne({username: this.data.username})
       if (usernameExists) {this.errors.push("That username is already taken.")}
     }
   
     // Only if email is valid then check to see if it's already taken
     if (validator.isEmail(this.data.email)) {
-      let emailExists = await usersCollection.findOne({email: this.data.email})
+      let emailExists = await UsersMONGOCOLLECTION.findOne({email: this.data.email})
       if (emailExists) {this.errors.push("That email is already being used.")}
     }
     resolve()
@@ -99,55 +115,54 @@ User.prototype.register = function() {
       // hash user password
       let salt = bcryptjs.genSaltSync(10)
       this.data.password = bcryptjs.hashSync(this.data.password, salt);
-      const user = await usersCollection.insertOne(this.data);
-      const userData = {
-        user: {
-          firstname: this.data.firstname,
-          lastname: this.data.lastname,
-          username: this.data.username,
-          email: this.data.email,
-          portfolio: '',
-          location: '',
-          instagramUsername: '',
-          twitterUsername: '',
-          bio: '',
-          interests: [ "wallpaper", "outdoor", "forest", "summer", "background" ],
-          checkMessage: false,
-        },
+      const user = await UsersMONGOCOLLECTION.insertOne(this.data);
+      const profile = {
+        firstname: this.data.firstname,
+        lastname: this.data.lastname,
+        username: this.data.username,
+        email: this.data.email,
+        portfolio: '',
+        location: '',
+        instagramUsername: '',
+        twitterUsername: '',
+        bio: '',
+        interests: [ "wallpaper", "outdoor", "forest", "summer", "background" ],
+        checkMessage: false,
         profileImage: '',
-        shared: [],
-        likes: [],
-        collection: [],
-        following: [],
         authorID: user.ops[0]._id,
-        authorUsername: this.data.username,
       };
-      await dataCollection.insertOne(userData);
-      resolve(user.ops[0]._id)
+      await ProfileMONGOCOLLECTION.insertOne(profile);
+      let filterData = {
+        _id: user.ops[0]._id,
+        firstname: this.data.firstname,
+        lastname: this.data.lastname,
+        username: this.data.username,
+        profileImage: '',
+      };
+      resolve(JSON.stringify(filterData));
+      const shared = {
+        shared: [],
+        authorID: user.ops[0]._id
+      }
+      await SharedMONGOCOLLECTION.insertOne(shared);
+      const likes = {
+        likes: [],
+        authorID: user.ops[0]._id
+      }
+      await LikesMONGOCOLLECTION.insertOne(likes);
+      const followings = {
+        followings: [],
+        authorID: user.ops[0]._id
+      }
+      await FollowingsMONGOCOLLECTION.insertOne(followings);
+      const collections = {
+        collections: [],
+        authorID: user.ops[0]._id
+      }
+      await CollectionsMONGOCOLLECTION.insertOne(collections);
     } else {
       reject(this.errors)
     }
-  });
-};
-
-// get data
-User.prototype.getData = function(id) {
-  return new Promise(async (resolve, reject) => {
-    if (typeof(id) !== 'string' && typeof(this.data.id) !== 'string' && this.data.id !== '214082ee-34f0-4316-8881-a474d8c82d7b') {
-      reject();
-      return;
-    }
-    let data = await dataCollection.findOne({ authorID: ObjectID(id) });
-    
-    data = {
-      user: data.user,
-      profileImage: data.profileImage,
-      shared: data.shared,
-      likes: data.likes,
-      collection: data.collection,
-      following: data.following,
-    };
-    resolve(data);
   });
 };
 
