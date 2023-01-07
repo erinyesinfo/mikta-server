@@ -2,7 +2,7 @@ const express = require("express");
 const helmet = require('helmet');
 const cors = require("cors");
 const session = require("express-session");
-const mongoStore = require("connect-mongo")(session);
+const mongoStore = require("connect-mongo");
 const app = express();
 
 const router = require("./router");
@@ -13,12 +13,13 @@ let sessionOptions = session({
   key : 'sid',
   proxy : true, // add this when behind a reverse proxy, if you need secure cookies
   secret: process.env.MONGO_SECRET,
-  store: new mongoStore({ client: require("./db") }),
+  store: mongoStore.create({ client: require("./db") }),
   resave: false,
   saveUninitialized: false
 });
 
 let whitelist = [
+  process.env.APP_PATH,
   'https://mikta.netlify.com',
   'https://mikta.netlify.app'
 ];
